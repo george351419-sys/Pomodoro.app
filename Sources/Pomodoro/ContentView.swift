@@ -110,35 +110,17 @@ private struct SettingsView: View {
                     .keyboardShortcut(.defaultAction)
             }
 
-            durationRow(
-                title: "专注",
-                value: $timer.workMinutes,
-                range: 1...120,
-                tint: .red
-            )
-            durationRow(
-                title: "短休息",
-                value: $timer.shortBreakMinutes,
-                range: 1...60,
-                tint: .green
-            )
-            durationRow(
-                title: "长休息",
-                value: $timer.longBreakMinutes,
-                range: 1...60,
-                tint: .blue
-            )
-
-            HStack {
-                Text("长休息间隔")
-                    .frame(width: 80, alignment: .leading)
-                Stepper(
-                    value: $timer.sessionsBeforeLongBreak,
-                    in: 2...10
-                ) {
-                    Text("每 \(timer.sessionsBeforeLongBreak) 个专注")
-                        .monospacedDigit()
-                }
+            settingRow(title: "专注", value: $timer.workMinutes, range: 1...120, tint: .red) {
+                "\($0) 分钟"
+            }
+            settingRow(title: "短休息", value: $timer.shortBreakMinutes, range: 1...60, tint: .green) {
+                "\($0) 分钟"
+            }
+            settingRow(title: "长休息", value: $timer.longBreakMinutes, range: 1...60, tint: .blue) {
+                "\($0) 分钟"
+            }
+            settingRow(title: "长休息间隔", value: $timer.sessionsBeforeLongBreak, range: 2...10) {
+                "每 \($0) 个专注"
             }
 
             Divider()
@@ -155,19 +137,19 @@ private struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private func durationRow(
+    private func settingRow(
         title: String,
         value: Binding<Int>,
         range: ClosedRange<Int>,
-        tint: Color
+        tint: Color = .primary,
+        format: (Int) -> String
     ) -> some View {
         HStack {
             Text(title)
                 .frame(width: 80, alignment: .leading)
                 .foregroundColor(tint)
             Stepper(value: value, in: range) {
-                Text("\(value.wrappedValue) 分钟")
+                Text(format(value.wrappedValue))
                     .monospacedDigit()
             }
         }

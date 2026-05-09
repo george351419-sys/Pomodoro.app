@@ -76,16 +76,15 @@ final class PomodoroTimer: ObservableObject {
     private var tickTask: Task<Void, Never>?
 
     init() {
-        let d = UserDefaults.standard
-        let w = d.object(forKey: Defaults.workMin) as? Int
-        let s = d.object(forKey: Defaults.shortMin) as? Int
-        let l = d.object(forKey: Defaults.longMin) as? Int
-        let n = d.object(forKey: Defaults.sessions) as? Int
-        self.workMinutes = w ?? Defaults.defaultWork
-        self.shortBreakMinutes = s ?? Defaults.defaultShort
-        self.longBreakMinutes = l ?? Defaults.defaultLong
-        self.sessionsBeforeLongBreak = n ?? Defaults.defaultSessions
-        self.remaining = (w ?? Defaults.defaultWork) * 60
+        self.workMinutes = Self.load(Defaults.workMin, default: Defaults.defaultWork)
+        self.shortBreakMinutes = Self.load(Defaults.shortMin, default: Defaults.defaultShort)
+        self.longBreakMinutes = Self.load(Defaults.longMin, default: Defaults.defaultLong)
+        self.sessionsBeforeLongBreak = Self.load(Defaults.sessions, default: Defaults.defaultSessions)
+        self.remaining = workMinutes * 60
+    }
+
+    private static func load(_ key: String, default fallback: Int) -> Int {
+        (UserDefaults.standard.object(forKey: key) as? Int) ?? fallback
     }
 
     var totalForPhase: Int {
@@ -116,7 +115,7 @@ final class PomodoroTimer: ObservableObject {
     var menuBarIcon: String { phase.icon }
 
     var cyclePosition: Int {
-        completedWorkSessions % max(sessionsBeforeLongBreak, 1)
+        completedWorkSessions % sessionsBeforeLongBreak
     }
 
     func toggle() {
@@ -141,6 +140,7 @@ final class PomodoroTimer: ObservableObject {
         isRunning = false
         tickTask?.cancel()
         tickTask = nil
+        endDate = nil
     }
 
     func reset() {
@@ -169,8 +169,10 @@ final class PomodoroTimer: ObservableObject {
 
     private func tick() {
         guard let end = endDate else { return }
-        let r = Int(end.timeIntervalSinceNow.rounded(.up))
-        remaining = max(0, r)
+        let new = max(0, Int(end.timeIntervalSinceNow.rounded(.up)))
+        if new != remaining {
+            remaining = new
+        }
         if remaining == 0 {
             advancePhase()
         }
@@ -185,7 +187,7 @@ final class PomodoroTimer: ObservableObject {
         let next: Phase
         switch finished {
         case .work:
-            next = (completedWorkSessions % max(sessionsBeforeLongBreak, 1) == 0)
+            next = (completedWorkSessions % sessionsBeforeLongBreak == 0)
                 ? .longBreak : .shortBreak
         case .shortBreak, .longBreak:
             next = .work
@@ -202,7 +204,7 @@ final class PomodoroTimer: ObservableObject {
         content.body = "下一阶段：\(next.label) · 点击菜单栏开始"
         content.sound = .default
         let req = UNNotificationRequest(
-            identifier: UUID().uuidString,
+            identifier: "pomodoro.phase",
             content: content,
             trigger: nil
         )

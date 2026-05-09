@@ -17,13 +17,10 @@ if [[ ! -f "${ICON_ICNS}" || "${ICON_SRC}" -nt "${ICON_ICNS}" ]]; then
     swift "${ICON_SRC}" "${ICON_PNG}"
     rm -rf "${ICONSET}"
     mkdir -p "${ICONSET}"
-    for spec in "16:icon_16x16" "32:icon_16x16@2x" "32:icon_32x32" \
-                "64:icon_32x32@2x" "128:icon_128x128" "256:icon_128x128@2x" \
-                "256:icon_256x256" "512:icon_256x256@2x" "512:icon_512x512" \
-                "1024:icon_512x512@2x"; do
-        sz="${spec%%:*}"
-        name="${spec##*:}"
-        sips -z "${sz}" "${sz}" "${ICON_PNG}" --out "${ICONSET}/${name}.png" >/dev/null
+    for sz in 16 32 128 256 512; do
+        d=$((sz * 2))
+        sips -z "${sz}" "${sz}" "${ICON_PNG}" --out "${ICONSET}/icon_${sz}x${sz}.png" >/dev/null
+        sips -z "${d}" "${d}" "${ICON_PNG}" --out "${ICONSET}/icon_${sz}x${sz}@2x.png" >/dev/null
     done
     iconutil -c icns "${ICONSET}" -o "${ICON_ICNS}"
     rm -rf "${ICONSET}" "${ICON_PNG}"
