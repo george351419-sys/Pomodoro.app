@@ -30,26 +30,69 @@ enum Phase {
     }
 }
 
+private enum Defaults {
+    static let workMin = "workMinutes"
+    static let shortMin = "shortBreakMinutes"
+    static let longMin = "longBreakMinutes"
+    static let sessions = "sessionsBeforeLongBreak"
+    static let defaultWork = 25
+    static let defaultShort = 5
+    static let defaultLong = 15
+    static let defaultSessions = 4
+}
+
 @MainActor
 final class PomodoroTimer: ObservableObject {
     @Published var phase: Phase = .work
-    @Published var remaining: Int = 25 * 60
+    @Published var remaining: Int = Defaults.defaultWork * 60
     @Published var isRunning: Bool = false
     @Published var completedWorkSessions: Int = 0
 
-    let workDuration = 25 * 60
-    let shortBreakDuration = 5 * 60
-    let longBreakDuration = 15 * 60
-    let sessionsBeforeLongBreak = 4
+    @Published var workMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(workMinutes, forKey: Defaults.workMin)
+            refreshIfIdle(.work)
+        }
+    }
+    @Published var shortBreakMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(shortBreakMinutes, forKey: Defaults.shortMin)
+            refreshIfIdle(.shortBreak)
+        }
+    }
+    @Published var longBreakMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(longBreakMinutes, forKey: Defaults.longMin)
+            refreshIfIdle(.longBreak)
+        }
+    }
+    @Published var sessionsBeforeLongBreak: Int {
+        didSet {
+            UserDefaults.standard.set(sessionsBeforeLongBreak, forKey: Defaults.sessions)
+        }
+    }
 
     private var endDate: Date?
     private var tickTask: Task<Void, Never>?
 
+    init() {
+        let d = UserDefaults.standard
+        let w = d.object(forKey: Defaults.workMin) as? Int
+        let s = d.object(forKey: Defaults.shortMin) as? Int
+        let l = d.object(forKey: Defaults.longMin) as? Int
+        let n = d.object(forKey: Defaults.sessions) as? Int
+        self.workMinutes = w ?? Defaults.defaultWork
+        self.shortBreakMinutes = s ?? Defaults.defaultShort
+        self.longBreakMinutes = l ?? Defaults.defaultLong
+        self.sessionsBeforeLongBreak = n ?? Defaults.defaultSessions
+        self.remaining = (w ?? Defaults.defaultWork) * 60
+    }
+
     var totalForPhase: Int {
         switch phase {
-        case .work: return workDuration
-        case .shortBreak: return shortBreakDuration
-        case .longBreak: return longBreakDuration
+        case .work: return workMinutes * 60
+        case .shortBreak: return shortBreakMinutes * 60
+        case .longBreak: return longBreakMinutes * 60
         }
     }
 
@@ -73,7 +116,7 @@ final class PomodoroTimer: ObservableObject {
     var menuBarIcon: String { phase.icon }
 
     var cyclePosition: Int {
-        completedWorkSessions % sessionsBeforeLongBreak
+        completedWorkSessions % max(sessionsBeforeLongBreak, 1)
     }
 
     func toggle() {
@@ -109,7 +152,19 @@ final class PomodoroTimer: ObservableObject {
         pause()
         phase = .work
         completedWorkSessions = 0
-        remaining = workDuration
+        remaining = workMinutes * 60
+    }
+
+    func restoreDefaults() {
+        workMinutes = Defaults.defaultWork
+        shortBreakMinutes = Defaults.defaultShort
+        longBreakMinutes = Defaults.defaultLong
+        sessionsBeforeLongBreak = Defaults.defaultSessions
+    }
+
+    private func refreshIfIdle(_ p: Phase) {
+        guard !isRunning, phase == p else { return }
+        remaining = totalForPhase
     }
 
     private func tick() {
@@ -130,7 +185,8 @@ final class PomodoroTimer: ObservableObject {
         let next: Phase
         switch finished {
         case .work:
-            next = (completedWorkSessions % sessionsBeforeLongBreak == 0) ? .longBreak : .shortBreak
+            next = (completedWorkSessions % max(sessionsBeforeLongBreak, 1) == 0)
+                ? .longBreak : .shortBreak
         case .shortBreak, .longBreak:
             next = .work
         }
